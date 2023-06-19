@@ -62,10 +62,10 @@ pub struct LcdI2c {
 }
 
 impl LcdI2c {
-    pub fn new(address: u8, oled: bool, columns: u8, rows: u8, backlight_value: u8) -> Self {
+    pub fn new(address: u8, _oled: bool, columns: u8, rows: u8, backlight_value: u8) -> Self {
         let dp = arduino_hal::Peripherals::take().unwrap();
         let pins = arduino_hal::pins!(dp);
-        let mut serial = arduino_hal::default_serial!(dp, pins, 57600);
+        let _serial = arduino_hal::default_serial!(dp, pins, 57600);
 
         let i2c = arduino_hal::I2c::new(
             dp.TWI,
@@ -88,7 +88,7 @@ impl LcdI2c {
         }
     }
 
-    pub fn begin(&mut self, cols: u8, lines: u8, dotsize: Option<u8>) {
+    pub fn begin(&mut self, _cols: u8, lines: u8, dotsize: Option<u8>) {
         if lines > 1 {
             self.display_function |= LCD_2LINE;
         }
@@ -122,7 +122,7 @@ impl LcdI2c {
         self.command(LCD_FUNCTIONSET | self.display_function);
 
         self.display_control = LCD_DISPLAYON | LCD_CURSOROFF | LCD_BLINKOFF;
-        self.display();
+        self.set_display(true);
 
         self.clear();
 
@@ -137,7 +137,7 @@ impl LcdI2c {
         self.command(LCD_CLEARDISPLAY);
         arduino_hal::delay_us(2000);
         if self.oled {
-            self.set_cursor(0, 0);
+            self.move_cursor(0, 0);
         }
     }
 
@@ -146,33 +146,31 @@ impl LcdI2c {
         arduino_hal::delay_us(2000);
     }
 
-    pub fn no_display(&mut self) {
-        self.display_control &= !LCD_DISPLAYON;
+    pub fn set_display(&mut self, on: bool) {
+        if on {
+            self.display_control |= LCD_DISPLAYON;
+        } else {
+            self.display_control &= !LCD_DISPLAYON;
+        }
+
         self.command(LCD_DISPLAYCONTROL | self.display_control);
     }
 
-    pub fn display(&mut self) {
-        self.display_control |= LCD_DISPLAYON;
+    pub fn set_blink(&mut self, on: bool) {
+        if on {
+            self.display_control |= LCD_BLINKON;
+        } else {
+            self.display_control &= !LCD_BLINKON;
+        }
         self.command(LCD_DISPLAYCONTROL | self.display_control);
     }
 
-    pub fn no_blink(&mut self) {
-        self.display_control &= !LCD_BLINKON;
-        self.command(LCD_DISPLAYCONTROL | self.display_control);
-    }
-
-    pub fn blink(&mut self) {
-        self.display_control |= LCD_BLINKON;
-        self.command(LCD_DISPLAYCONTROL | self.display_control);
-    }
-
-    pub fn no_cursor(&mut self) {
-        self.display_control &= !LCD_CURSORON;
-        self.command(LCD_DISPLAYCONTROL | self.display_control);
-    }
-
-    pub fn cursor(&mut self) {
-        self.display_control |= LCD_CURSORON;
+    pub fn set_cursor(&mut self, on: bool) {
+        if on {
+            self.display_control |= LCD_CURSORON;
+        } else {
+            self.display_control &= !LCD_CURSORON;
+        }
         self.command(LCD_DISPLAYCONTROL | self.display_control);
     }
 
@@ -194,27 +192,25 @@ impl LcdI2c {
         self.command(LCD_ENTRYMODESET | self.display_mode);
     }
 
-    pub fn no_backlight(&mut self) {
-        self.backlight_value = LCD_NOBACKLIGHT;
+    pub fn set_backlight(&mut self, on: bool) {
+        if on {
+            self.backlight_value = LCD_BACKLIGHT;
+        } else {
+            self.backlight_value = LCD_NOBACKLIGHT;
+        }
         self.expander_write(0);
     }
 
-    pub fn backlight(&mut self) {
-        self.backlight_value = LCD_BACKLIGHT;
-        self.expander_write(0);
-    }
-
-    pub fn autoscroll(&mut self) {
-        self.display_mode |= LCD_ENTRYSHIFTINCREMENT;
+    pub fn set_autoscroll(&mut self, on: bool) {
+        if on {
+            self.display_mode |= LCD_ENTRYSHIFTINCREMENT;
+        } else {
+            self.display_mode &= !LCD_ENTRYSHIFTINCREMENT;
+        }
         self.command(LCD_ENTRYMODESET | self.display_mode);
     }
 
-    pub fn no_autoscroll(&mut self) {
-        self.display_mode &= !LCD_ENTRYSHIFTINCREMENT;
-        self.command(LCD_ENTRYMODESET | self.display_mode);
-    }
-
-    pub fn set_cursor(&mut self, column: u8, row: u8) {
+    pub fn move_cursor(&mut self, column: u8, row: u8) {
         let row_offsets: [u8; 4] = [0x00, 0x40, 0x14, 0x54];
         let mut row = row;
         if row > self.num_lines {
@@ -236,9 +232,18 @@ impl LcdI2c {
         self.init();
     }
 
-    pub fn print() {}
+    pub fn print(&mut self, data: &[u8]) {
+        for char in data {
+            self.write(*char);
+        }
+    }
 
-    pub fn println() {}
+    pub fn println(&mut self, data: &[u8]) {
+        for char in data {
+            self.write(*char);
+        }
+        self.move_cursor(0, 1);
+    }
 
     fn init_private(&mut self) {
         self.display_function = LCD_4BITMODE | LCD_1LINE | LCD_5X8_DOTS;
@@ -279,5 +284,5 @@ impl LcdI2c {
 
 /*
    # Todo
-   - genauer nach schauen wie ich write implmentieren soll
+   - genauer nach schauen wie ich print und println implmentieren soll
 */
