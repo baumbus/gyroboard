@@ -1,5 +1,3 @@
-#![no_std]
-
 use arduino_hal::prelude::*;
 
 // commands
@@ -94,7 +92,7 @@ impl LcdI2c {
         }
         self.num_lines = lines;
 
-        let dotsize = match dotsize {
+        let dotsize: u8 = match dotsize {
             Some(size) => size,
             None => LCD_5X8_DOTS,
         };
